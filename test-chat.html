@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chat</title>
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <style>
+        #messages {
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+        .message {
+            margin: 5px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .received {
+            background-color: #e3f2fd;
+        }
+        .sent {
+            background-color: #e8f5e9;
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h2>Test Chat</h2>
+        <div>
+            <input type="text" id="tokenInput" placeholder="Введите JWT токен" style="width: 300px;">
+            <button onclick="connect()">Подключиться</button>
+        </div>
+        <br>
+        <div>
+            <input type="text" id="receiverId" placeholder="ID получателя">
+            <input type="text" id="messageInput" placeholder="Введите сообщение">
+            <button onclick="sendMessage()">Отправить</button>
+        </div>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let socket;
+
+        function connect() {
+            const token = document.getElementById('tokenInput').value;
+            
+            // Отключаем предыдущее соединение, если есть
+            if (socket) {
+                socket.disconnect();
+            }
+
+            // Создаем новое подключение
+            socket = io('http://localhost:5001', {
+                auth: {
+                    token: token
+                }
+            });
+
+            // Обработка успешного подключения
+            socket.on('connect', () => {
+                addMessage('System: Connected to server');
+            });
+
+            // Обработка ошибок подключения
+            socket.on('connect_error', (error) => {
+                addMessage('Error: ' + error.message);
+            });
+
+            // Прослушивание новых сообщений
+            socket.on('receiveMessage', (message) => {
+                addMessage(`Received from ${message.sender.name}: ${message.content}`, 'received');
+            });
+        }
+
+        function sendMessage() {
+            const receiverId = document.getElementById('receiverId').value;
+            const content = document.getElementById('messageInput').value;
+
+            // Отправляем сообщение через REST API
+            fetch(`http://localhost:5001/api/messages/${receiverId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + document.getElementById('tokenInput').value
+                },
+                body: JSON.stringify({ content })
+            })
+            .then(response => response.json())
+            .then(message => {
+                addMessage(`Sent: ${message.content}`, 'sent');
+                document.getElementById('messageInput').value = '';
+            })
+            .catch(error => {
+                addMessage('Error sending message: ' + error.message);
+            });
+        }
+
+        function addMessage(text, type = '') {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            messageElement.textContent = text;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html> 
