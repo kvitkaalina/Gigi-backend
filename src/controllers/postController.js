@@ -7,102 +7,48 @@ import fs from 'fs/promises';
 export const getAllPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
-    const sortBy = req.query.sort || 'latest';
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Получаем общее количество постов
-    const total = await Post.countDocuments();
-    const totalPages = Math.ceil(total / limit);
-
-    // Получаем текущего пользователя
-    const currentUser = await User.findById(req.user._id);
-    if (!currentUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Базовый запрос для всех постов
-    let query = Post.find();
-
-    // Применяем сортировку
-    if (sortBy === 'popular') {
-      // Используем агрегацию для правильной сортировки по количеству лайков
-      const posts = await Post.aggregate([
-        {
-          $addFields: {
-            likesCount: { $size: "$likes" }
-          }
-        },
-        {
-          $sort: { likesCount: -1, createdAt: -1 }
-        },
-        { $skip: skip },
-        { $limit: limit }
-      ]);
-
-      // Populate для агрегированных результатов
-      await Post.populate(posts, [
-        { 
-          path: 'author', 
-          select: 'username avatar',
-          options: { required: true }
-        },
-        {
-          path: 'comments',
-          populate: {
-            path: 'user',
-            select: 'username avatar',
-            options: { required: true }
-          },
-          options: { sort: { createdAt: -1 } }
-        }
-      ]);
-
-      // Проверяем, есть ли еще посты
-      const hasMore = page < totalPages;
-
-      return res.json({
-        posts,
-        currentPage: page,
-        totalPages,
-        hasMore,
-        total
-      });
-    } else {
-      // Для обычной сортировки по дате
-      const posts = await query
+    // Получаем только необходимые данные для текущей страницы
+    const [posts, total] = await Promise.all([
+      Post.find()
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({
-          path: 'author',
-          select: 'username avatar',
-          options: { required: true }
-        })
+        .select('image description createdAt')
+        .populate('author', 'username avatar')
         .populate({
           path: 'comments',
+          options: { sort: { createdAt: -1 }, limit: 2 },
           populate: {
             path: 'user',
-            select: 'username avatar',
-            options: { required: true }
-          },
-          options: { sort: { createdAt: -1 } }
-        });
+            select: 'username avatar'
+          }
+        })
+        .lean(),
+      Post.countDocuments()
+    ]);
 
-      // Проверяем, есть ли еще посты
-      const hasMore = page < totalPages;
+    const totalPages = Math.ceil(total / limit);
+    const hasMore = page < totalPages;
 
-      res.json({
-        posts,
-        currentPage: page,
-        totalPages,
-        hasMore,
-        total
-      });
-    }
+    // Оптимизированный ответ
+    res.json({
+      posts,
+      currentPage: page,
+      totalPages,
+      hasMore,
+      total,
+      nextPage: hasMore ? page + 1 : null
+    });
+
   } catch (error) {
     console.error('Error fetching posts:', error);
-    res.status(500).json({ message: 'Error fetching posts', error: error.message });
+    res.status(500).json({ 
+      message: 'Error fetching posts', 
+      error: error.message 
+    });
   }
 };
 
