@@ -188,7 +188,7 @@ export const getChats = async (req, res) => {
           _id: 1,
           user: {
             _id: 1,
-            name: '$user.username',
+            username: '$user.username',
             avatar: { $ifNull: ['$user.avatar', '/default-avatar.jpg'] }
           },
           lastMessage: 1,
@@ -237,19 +237,19 @@ export const createChat = async (req, res) => {
       _id: otherUser._id,
       user: {
         _id: otherUser._id,
-        name: otherUser.username,
+        username: otherUser.username,
         avatar: otherUser.avatar || '/default-avatar.jpg'
       },
       lastMessage: {
         ...populatedMessage,
         sender: {
           _id: populatedMessage.sender._id,
-          name: populatedMessage.sender.username,
+          username: populatedMessage.sender.username,
           avatar: populatedMessage.sender.avatar || '/default-avatar.jpg'
         },
         receiver: {
           _id: populatedMessage.receiver._id,
-          name: populatedMessage.receiver.username,
+          username: populatedMessage.receiver.username,
           avatar: populatedMessage.receiver.avatar || '/default-avatar.jpg'
         }
       },

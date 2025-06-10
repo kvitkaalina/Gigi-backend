@@ -21,10 +21,28 @@ export const createNotification = async (userId, actorId, type, targetId) => {
 // Получить все уведомления пользователя
 export const getNotifications = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Не авторизован' });
+    }
+
     const notifications = await Notification.find({ user: req.user.id })
-      .populate('actor', 'username avatar')
-      .populate('target', 'image caption')
+      .populate('actor', 'username fullName avatar')
+      .populate({
+        path: 'target',
+        select: 'image description likes',
+        model: 'Post'
+      })
       .sort({ createdAt: -1 });
+
+    console.log('Fetched notifications:', {
+      userId: req.user.id,
+      count: notifications.length,
+      notifications: notifications.map(n => ({
+        id: n._id,
+        type: n.type,
+        hasTarget: !!n.target
+      }))
+    });
 
     res.json(notifications);
   } catch (error) {
@@ -94,12 +112,13 @@ export const deleteNotification = async (req, res) => {
 export const getUnreadCount = async (req, res) => {
   try {
     const count = await Notification.countDocuments({
-      recipient: req.user._id,
-      read: false
+      user: req.user.id,
+      isRead: false
     });
 
     res.json({ count });
   } catch (error) {
+    console.error('Ошибка при подсчете уведомлений:', error);
     res.status(500).json({ message: 'Ошибка при подсчете уведомлений' });
   }
 }; 

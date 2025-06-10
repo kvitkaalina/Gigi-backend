@@ -11,6 +11,10 @@ export const getAllPosts = async (req, res) => {
     const sortBy = req.query.sort || 'latest';
     const skip = (page - 1) * limit;
 
+    // Получаем общее количество постов
+    const total = await Post.countDocuments();
+    const totalPages = Math.ceil(total / limit);
+
     // Получаем текущего пользователя
     const currentUser = await User.findById(req.user._id);
     if (!currentUser) {
@@ -54,13 +58,15 @@ export const getAllPosts = async (req, res) => {
         }
       ]);
 
-      const total = await Post.countDocuments();
+      // Проверяем, есть ли еще посты
+      const hasMore = page < totalPages;
 
       return res.json({
         posts,
         currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        hasMore: skip + posts.length < total
+        totalPages,
+        hasMore,
+        total
       });
     } else {
       // Для обычной сортировки по дате
@@ -83,13 +89,15 @@ export const getAllPosts = async (req, res) => {
           options: { sort: { createdAt: -1 } }
         });
 
-      const total = await Post.countDocuments();
+      // Проверяем, есть ли еще посты
+      const hasMore = page < totalPages;
 
       res.json({
         posts,
         currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        hasMore: skip + posts.length < total
+        totalPages,
+        hasMore,
+        total
       });
     }
   } catch (error) {

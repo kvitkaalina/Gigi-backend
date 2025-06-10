@@ -33,7 +33,7 @@ postSchema.virtual('comments', {
 
 // Виртуальное поле для количества лайков
 postSchema.virtual('likesCount').get(function() {
-  return this.likes.length;
+  return this.likes ? this.likes.length : 0;
 });
 
 const Post = mongoose.model('Post', postSchema);

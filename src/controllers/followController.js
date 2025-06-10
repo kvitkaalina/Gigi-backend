@@ -92,26 +92,54 @@ export const unfollowUser = async (req, res) => {
 export const getFollowers = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log('Getting followers for user:', userId);
 
     // Проверяем существование пользователя
     const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found:', userId);
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
+    // Используем populate для получения информации о подписчиках
     const followers = await Follow.find({ following: userId })
-      .populate('follower', 'username avatar bio')
+      .populate({
+        path: 'follower',
+        select: 'username avatar bio'
+      })
       .sort({ createdAt: -1 });
 
-    const formattedFollowers = followers.map(follow => ({
-      ...follow.follower.toObject(),
-      isFollowing: false // Это поле будет обновлено на фронтенде
-    }));
+    console.log('Found followers:', followers.length);
+
+    // Фильтруем и форматируем данные для фронтенда
+    const formattedFollowers = followers
+      .filter(follow => follow.follower !== null) // Фильтруем удаленных пользователей
+      .map(follow => ({
+        _id: follow.follower._id,
+        username: follow.follower.username,
+        avatar: follow.follower.avatar,
+        bio: follow.follower.bio,
+        isFollowing: false
+      }));
+
+    // Удаляем недействительные подписки
+    const invalidFollows = followers.filter(follow => follow.follower === null);
+    if (invalidFollows.length > 0) {
+      console.log(`Removing ${invalidFollows.length} invalid follows`);
+      await Follow.deleteMany({
+        _id: { $in: invalidFollows.map(f => f._id) }
+      });
+      
+      // Обновляем количество подписчиков у пользователя
+      await User.findByIdAndUpdate(userId, {
+        $pull: { followers: { $in: invalidFollows.map(f => f.follower) } }
+      });
+    }
 
     res.json(formattedFollowers);
   } catch (error) {
-    console.error('Ошибка при получении списка подписчиков:', error);
-    res.status(500).json({ message: 'Ошибка при получении списка подписчиков' });
+    console.error('Error in getFollowers:', error);
+    res.status(500).json({ message: 'Ошибка при получении списка подписчиков', error: error.message });
   }
 };
 
@@ -119,26 +147,54 @@ export const getFollowers = async (req, res) => {
 export const getFollowing = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log('Getting following for user:', userId);
 
     // Проверяем существование пользователя
     const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found:', userId);
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
+    // Используем populate для получения информации о подписках
     const following = await Follow.find({ follower: userId })
-      .populate('following', 'username avatar bio')
+      .populate({
+        path: 'following',
+        select: 'username avatar bio'
+      })
       .sort({ createdAt: -1 });
 
-    const formattedFollowing = following.map(follow => ({
-      ...follow.following.toObject(),
-      isFollowing: true
-    }));
+    console.log('Found following:', following.length);
+
+    // Фильтруем и форматируем данные для фронтенда
+    const formattedFollowing = following
+      .filter(follow => follow.following !== null) // Фильтруем удаленных пользователей
+      .map(follow => ({
+        _id: follow.following._id,
+        username: follow.following.username,
+        avatar: follow.following.avatar,
+        bio: follow.following.bio,
+        isFollowing: true
+      }));
+
+    // Удаляем недействительные подписки
+    const invalidFollows = following.filter(follow => follow.following === null);
+    if (invalidFollows.length > 0) {
+      console.log(`Removing ${invalidFollows.length} invalid follows`);
+      await Follow.deleteMany({
+        _id: { $in: invalidFollows.map(f => f._id) }
+      });
+      
+      // Обновляем количество подписок у пользователя
+      await User.findByIdAndUpdate(userId, {
+        $pull: { following: { $in: invalidFollows.map(f => f.following) } }
+      });
+    }
 
     res.json(formattedFollowing);
   } catch (error) {
-    console.error('Ошибка при получении списка подписок:', error);
-    res.status(500).json({ message: 'Ошибка при получении списка подписок' });
+    console.error('Error in getFollowing:', error);
+    res.status(500).json({ message: 'Ошибка при получении списка подписок', error: error.message });
   }
 };
 

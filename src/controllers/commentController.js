@@ -6,7 +6,7 @@ import { createNotification } from './notificationController.js';
 export const createComment = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { content } = req.body;
+    const { text } = req.body;
     const userId = req.user.id;
 
     // Проверяем существование поста
@@ -19,7 +19,7 @@ export const createComment = async (req, res) => {
     const comment = new Comment({
       post: postId,
       user: userId,
-      text: content
+      text: text
     });
 
     await comment.save();
