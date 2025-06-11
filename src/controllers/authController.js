@@ -73,12 +73,14 @@ const registerUser = async (req, res) => {
       email,
       password,
       fullName,
+      role: email === process.env.ADMIN_EMAIL ? 'admin' : 'user'
     });
 
     console.log('User created successfully:', {
       id: user._id,
       username: user.username,
-      email: user.email
+      email: user.email,
+      role: user.role
     });
 
     if (user) {
@@ -293,5 +295,31 @@ const resetPassword = async (req, res) => {
     });
   }
 };
+
+// Добавляем новую функцию после существующих
+const updateAdminRole = async () => {
+  try {
+    // Проверяем наличие ADMIN_EMAIL
+    if (!process.env.ADMIN_EMAIL) {
+      console.log('ADMIN_EMAIL not found in environment variables');
+      return;
+    }
+
+    // Ищем пользователя с админским email
+    const adminUser = await User.findOne({ email: process.env.ADMIN_EMAIL.toLowerCase() });
+    
+    if (adminUser && adminUser.role !== 'admin') {
+      console.log('Updating user to admin role:', adminUser.email);
+      adminUser.role = 'admin';
+      await adminUser.save();
+      console.log('Successfully updated user to admin role');
+    }
+  } catch (error) {
+    console.error('Error updating admin role:', error);
+  }
+};
+
+// Вызываем функцию при старте сервера
+updateAdminRole();
 
 export { registerUser, loginUser, forgotPassword, resetPassword }; 

@@ -17,6 +17,7 @@ import messageRoutes from './routes/messageRoutes.js';
 import followRoutes from './routes/followRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { initializeSocketIO } from './socket/socketManager.js';
 
 // Получаем путь к текущему файлу и директории
@@ -78,6 +79,7 @@ app.use((req, res, next) => {
 
 // Роуты
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/posts', commentRoutes);

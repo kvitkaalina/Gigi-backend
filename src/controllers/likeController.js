@@ -25,7 +25,8 @@ export const toggleLike = async (req, res) => {
         postId,
         { $pull: { likes: userId } },
         { new: true }
-      );
+      ).populate('likes');
+      
       res.json({ 
         message: 'Лайк удален', 
         hasLiked: false,
@@ -38,12 +39,13 @@ export const toggleLike = async (req, res) => {
         post: postId
       });
       await newLike.save();
+      
       // Добавляем ID пользователя в массив лайков поста
       const updatedPost = await Post.findByIdAndUpdate(
         postId,
         { $addToSet: { likes: userId } },
         { new: true }
-      );
+      ).populate('likes');
 
       // Создаем уведомление только если лайк ставит не автор поста
       if (post.author.toString() !== userId.toString()) {
@@ -68,22 +70,18 @@ export const getPostLikes = async (req, res) => {
     const { postId } = req.params;
 
     // Проверяем существование поста
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).populate('likes');
     if (!post) {
       return res.status(404).json({ message: 'Пост не найден' });
     }
 
     // Получаем все лайки для поста с информацией о пользователях
     const likes = await Like.find({ post: postId })
-      .populate('user', 'username avatar')
-      .sort({ createdAt: -1 });
-
-    // Получаем общее количество лайков
-    const likesCount = await Like.countDocuments({ post: postId });
+      .populate('user', 'username avatar');
 
     res.json({
-      likes,
-      count: likesCount
+      likes: likes,
+      count: likes.length
     });
   } catch (error) {
     console.error('Ошибка при получении лайков поста:', error);
@@ -97,23 +95,28 @@ export const checkUserLike = async (req, res) => {
     const { postId } = req.params;
     const userId = req.user.id;
 
-    const like = await Like.findOne({ user: userId, post: postId });
-    const post = await Post.findById(postId);
+    // Получаем информацию о лайке и посте
+    const [like, post] = await Promise.all([
+      Like.findOne({ user: userId, post: postId }),
+      Post.findById(postId)
+    ]);
+
+    if (!post) {
+      return res.status(404).json({ message: 'Пост не найден' });
+    }
+
+    // Получаем актуальное количество лайков
+    const likesCount = await Like.countDocuments({ post: postId });
     
-    // Синхронизируем данные, если они различаются
-    if (like && !post.likes.includes(userId)) {
-      await Post.findByIdAndUpdate(postId, {
-        $addToSet: { likes: userId }
-      });
-    } else if (!like && post.likes.includes(userId)) {
-      await Post.findByIdAndUpdate(postId, {
-        $pull: { likes: userId }
-      });
+    // Обновляем массив лайков в посте, если есть несоответствие
+    if (likesCount !== post.likes.length) {
+      const allLikes = await Like.find({ post: postId }).distinct('user');
+      await Post.findByIdAndUpdate(postId, { likes: allLikes });
     }
 
     res.json({ 
       hasLiked: !!like,
-      likesCount: post.likes.length 
+      likesCount: likesCount
     });
   } catch (error) {
     console.error('Ошибка при проверке лайка:', error);

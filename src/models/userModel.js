@@ -22,6 +22,15 @@ const userSchema = new mongoose.Schema({
       minlength: [6, 'Password must be at least 6 characters'],
       select: false
     },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user'
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false
+    },
     fullName: {
       type: String,
       required: [true, 'Please enter your full name']
