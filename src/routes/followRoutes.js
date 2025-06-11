@@ -1,5 +1,6 @@
 import express from 'express';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { protect } from '../middlewares/authMiddleware.js';
+import { checkBlockedStatus } from '../middlewares/checkBlockedStatus.js';
 import {
   followUser,
   unfollowUser,
@@ -10,19 +11,16 @@ import {
 
 const router = express.Router();
 
-// Подписаться на пользователя
-router.post('/:userId/follow', authMiddleware, followUser);
+// Публичные маршруты
+router.get('/followers/:userId', getFollowers);
+router.get('/following/:userId', getFollowing);
 
-// Отписаться от пользователя
-router.delete('/:userId/follow', authMiddleware, unfollowUser);
+// Защищенные маршруты
+router.use(protect);
+router.use(checkBlockedStatus);
 
-// Получить список подписчиков пользователя
-router.get('/:userId/followers', authMiddleware, getFollowers);
-
-// Получить список подписок пользователя
-router.get('/:userId/following', authMiddleware, getFollowing);
-
-// Проверить, подписан ли текущий пользователь на указанного
-router.get('/:userId/following/check', authMiddleware, checkFollowing);
+router.post('/:userId', followUser);
+router.delete('/:userId', unfollowUser);
+router.get('/check/:userId', checkFollowing);
 
 export default router; 

@@ -1,5 +1,6 @@
 import express from 'express';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { protect } from '../middlewares/authMiddleware.js';
+import { checkBlockedStatus } from '../middlewares/checkBlockedStatus.js';
 import {
   toggleLike,
   getPostLikes,
@@ -8,9 +9,13 @@ import {
 
 const router = express.Router();
 
+// Защищенные маршруты
+router.use(protect);
+router.use(checkBlockedStatus);
+
 // Маршруты для лайков
-router.post('/:postId', authMiddleware, toggleLike);
+router.post('/:postId', toggleLike);
 router.get('/:postId', getPostLikes);
-router.get('/:postId/check', authMiddleware, checkUserLike);
+router.get('/check/:postId', checkUserLike);
 
 export default router; 

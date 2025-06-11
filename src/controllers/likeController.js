@@ -20,14 +20,13 @@ export const toggleLike = async (req, res) => {
     if (existingLike) {
       // Если лайк существует - удаляем его
       await existingLike.deleteOne();
-      // Удаляем ID пользователя из массива лайков поста
       const updatedPost = await Post.findByIdAndUpdate(
         postId,
         { $pull: { likes: userId } },
         { new: true }
       ).populate('likes');
       
-      res.json({ 
+      return res.json({ 
         message: 'Лайк удален', 
         hasLiked: false,
         likesCount: updatedPost.likes.length 
@@ -40,19 +39,17 @@ export const toggleLike = async (req, res) => {
       });
       await newLike.save();
       
-      // Добавляем ID пользователя в массив лайков поста
       const updatedPost = await Post.findByIdAndUpdate(
         postId,
         { $addToSet: { likes: userId } },
         { new: true }
       ).populate('likes');
 
-      // Создаем уведомление только если лайк ставит не автор поста
       if (post.author.toString() !== userId.toString()) {
         await createNotification(post.author, userId, 'like', postId);
       }
 
-      res.json({ 
+      return res.json({ 
         message: 'Лайк добавлен', 
         hasLiked: true,
         likesCount: updatedPost.likes.length 

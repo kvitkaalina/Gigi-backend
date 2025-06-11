@@ -1,7 +1,7 @@
 import express from 'express';
-import { getAllUsers, toggleUserBlock, deleteUser, getUserDetails } from '../controllers/adminController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect } from '../middlewares/authMiddleware.js';
 import { isAdmin } from '../middlewares/adminMiddleware.js';
+import { getAllUsers, toggleUserBlock, deleteUser, getUserDetails } from '../controllers/adminController.js';
 
 const router = express.Router();
 

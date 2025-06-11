@@ -76,12 +76,23 @@ export const markNotificationAsRead = async (req, res) => {
 // Отметить все уведомления как прочитанные
 export const markAllNotificationsAsRead = async (req, res) => {
   try {
+    // Обновляем все непрочитанные уведомления пользователя
     await Notification.updateMany(
       { user: req.user.id, isRead: false },
-      { isRead: true }
+      { $set: { isRead: true } }
     );
 
-    res.json({ message: 'Все уведомления отмечены как прочитанные' });
+    // Получаем обновленный список уведомлений
+    const updatedNotifications = await Notification.find({ user: req.user.id })
+      .populate('actor', 'username fullName avatar')
+      .populate({
+        path: 'target',
+        select: 'image description',
+        model: 'Post'
+      })
+      .sort({ createdAt: -1 });
+
+    res.json(updatedNotifications);
   } catch (error) {
     console.error('Ошибка при обновлении уведомлений:', error);
     res.status(500).json({ message: 'Ошибка при обновлении уведомлений' });

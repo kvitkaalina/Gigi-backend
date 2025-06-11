@@ -71,6 +71,11 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(express.json());
 
+// Обработка статических файлов
+const uploadsPath = join(process.cwd(), 'uploads');
+console.log('Uploads directory path:', uploadsPath);
+app.use('/uploads', express.static(uploadsPath));
+
 // Добавляем io в объект запроса
 app.use((req, res, next) => {
   req.io = io;
@@ -88,9 +93,6 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/follow', followRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
-
-// Обработка статических файлов
-app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
 // Инициализация Socket.IO
 initializeSocketIO(io);

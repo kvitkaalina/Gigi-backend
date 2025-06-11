@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 
 // Middleware для защиты маршрутов
-const authMiddleware = async (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
 
   if (
@@ -46,4 +46,5 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-export { authMiddleware }; 
+// Алиас для обратной совместимости
+export const authMiddleware = protect; 

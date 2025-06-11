@@ -1,6 +1,6 @@
 import express from 'express';
-import multer from 'multer';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { protect } from '../middlewares/authMiddleware.js';
+import { checkBlockedStatus } from '../middlewares/checkBlockedStatus.js';
 import {
   getAllPosts,
   getUserPosts,
@@ -9,6 +9,7 @@ import {
   updatePost,
   deletePost
 } from '../controllers/postController.js';
+import multer from 'multer';
 
 const router = express.Router();
 
@@ -21,14 +22,14 @@ const upload = multer({
   }
 });
 
-// Публичные маршруты
-router.get('/', authMiddleware, getAllPosts); // Получение всех постов
-router.get('/user/:username', getUserPosts); // Получение постов конкретного пользователя по username
-router.get('/:id', getPostById); // Получение конкретного поста
+// Публичные маршруты (не требуют проверки блокировки)
+router.get('/', getAllPosts);
+router.get('/user/:username', getUserPosts);
+router.get('/:id', getPostById);
 
-// Защищенные маршруты (требуют аутентификации)
-router.post('/', authMiddleware, upload.single('image'), createPost); // Создание поста
-router.put('/:id', authMiddleware, upload.single('image'), updatePost); // Обновление поста
-router.delete('/:id', authMiddleware, deletePost); // Удаление поста
+// Защищенные маршруты (требуют проверки блокировки)
+router.post('/', protect, checkBlockedStatus, upload.single('image'), createPost);
+router.put('/:id', protect, checkBlockedStatus, upload.single('image'), updatePost);
+router.delete('/:id', protect, checkBlockedStatus, deletePost);
 
 export default router; 
