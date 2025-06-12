@@ -29,6 +29,21 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Пользователь не найден' });
       }
 
+      // Проверяем статус админа при каждом запросе
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+      const shouldBeAdmin = adminEmails.includes(user.email);
+      
+      // Обновляем роль если необходимо
+      if (shouldBeAdmin && user.role !== 'admin') {
+        user.role = 'admin';
+        await user.save();
+        console.log(`Updated user ${user.email} role to admin during request`);
+      } else if (!shouldBeAdmin && user.role === 'admin') {
+        user.role = 'user';
+        await user.save();
+        console.log(`Removed admin role from user ${user.email} during request`);
+      }
+
       req.user = user;
       next();
     } catch (error) {

@@ -68,19 +68,23 @@ const registerUser = async (req, res) => {
 
     console.log('Creating new user in database...');
     // Create new user
+    const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+    const isAdmin = adminEmails.includes(email);
+    
     const user = await User.create({
       username,
       email,
       password,
       fullName,
-      role: email === process.env.ADMIN_EMAIL ? 'admin' : 'user'
+      role: isAdmin ? 'admin' : 'user'
     });
 
     console.log('User created successfully:', {
       id: user._id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      isAdmin
     });
 
     if (user) {
@@ -147,6 +151,21 @@ const loginUser = async (req, res) => {
 
       if (isMatch) {
         console.log('Password matched for user:', user.username);
+        
+        // Проверяем, должен ли пользователь быть админом
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+        const shouldBeAdmin = adminEmails.includes(user.email);
+        
+        // Обновляем роль если необходимо
+        if (shouldBeAdmin && user.role !== 'admin') {
+          user.role = 'admin';
+          await user.save();
+          console.log(`Updated user ${user.email} role to admin during login`);
+        } else if (!shouldBeAdmin && user.role === 'admin') {
+          user.role = 'user';
+          await user.save();
+          console.log(`Removed admin role from user ${user.email} during login`);
+        }
         
         const token = generateToken(user._id);
         console.log('Token generated:', !!token);
@@ -296,6 +315,67 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// @desc    Update user role based on ADMIN_EMAILS
+// @route   PUT /api/auth/update-role/:userId
+// @access  Admin
+const updateUserRole = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+    const shouldBeAdmin = adminEmails.includes(user.email);
+    
+    if (shouldBeAdmin && user.role !== 'admin') {
+      user.role = 'admin';
+      await user.save();
+      
+      console.log(`Updated user ${user.email} role to admin`);
+      res.json({
+        message: 'User role updated to admin',
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } else if (!shouldBeAdmin && user.role === 'admin') {
+      user.role = 'user';
+      await user.save();
+      
+      console.log(`Updated user ${user.email} role to user`);
+      res.json({
+        message: 'User role updated to user',
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } else {
+      res.json({
+        message: 'No role update needed',
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Role update error:', error);
+    res.status(res.statusCode === 200 ? 500 : res.statusCode);
+    res.json({
+      message: error.message,
+      stack: process.env.NODE_ENV === 'production' ? null : error.stack
+    });
+  }
+};
+
 // Добавляем новую функцию после существующих
 const updateAdminRole = async () => {
   try {
@@ -322,4 +402,10 @@ const updateAdminRole = async () => {
 // Вызываем функцию при старте сервера
 updateAdminRole();
 
-export { registerUser, loginUser, forgotPassword, resetPassword }; 
+export {
+  registerUser,
+  loginUser,
+  forgotPassword,
+  resetPassword,
+  updateUserRole
+}; 

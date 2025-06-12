@@ -1,7 +1,10 @@
 const isAdmin = async (req, res, next) => {
     try {
+        // Получаем список админских email из переменной окружения
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+        
         // Проверяем, есть ли пользователь и является ли он админом
-        if (req.user && req.user.role === 'admin') {
+        if (req.user && (req.user.role === 'admin' || adminEmails.includes(req.user.email))) {
             next();
         } else {
             res.status(403).json({ 
