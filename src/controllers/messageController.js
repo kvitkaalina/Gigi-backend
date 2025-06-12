@@ -1,6 +1,7 @@
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
 import mongoose from 'mongoose';
+import { uploadImage } from '../utils/imageUpload.js';
 
 // Получение истории сообщений между двумя пользователями
 export const getMessages = async (req, res) => {
@@ -56,8 +57,9 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { userId: receiverId } = req.params;
-    const { content } = req.body;
+    const { content, type = 'text' } = req.body;
     const senderId = req.user.id;
+    let messageContent = content;
 
     // Проверяем существование получателя
     const receiver = await User.findById(receiverId);
@@ -65,11 +67,23 @@ export const sendMessage = async (req, res) => {
       return res.status(404).json({ message: 'Recipient not found' });
     }
 
+    // Если это изображение, загружаем его
+    if (type === 'image' && req.file) {
+      try {
+        const imageUrl = await uploadImage(req.file);
+        messageContent = imageUrl;
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        return res.status(500).json({ message: 'Error uploading image' });
+      }
+    }
+
     // Создаем новое сообщение
     const message = new Message({
       sender: senderId,
       receiver: receiverId,
-      content,
+      content: messageContent,
+      type,
       createdAt: new Date()
     });
 

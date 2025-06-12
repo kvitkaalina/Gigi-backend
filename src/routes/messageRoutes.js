@@ -7,8 +7,11 @@ import {
   getChats,
   createChat
 } from '../controllers/messageController.js';
+import multer from 'multer';
 
 const router = express.Router();
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Получение списка чатов пользователя
 router.get('/chats', authMiddleware, getChats);
@@ -20,7 +23,12 @@ router.post('/chats', authMiddleware, createChat);
 router.get('/:userId', authMiddleware, getMessages);
 
 // Отправка сообщения конкретному пользователю
-router.post('/:userId', authMiddleware, sendMessage);
+router.post(
+  '/:userId',
+  authMiddleware,
+  upload.single('file'),
+  sendMessage
+);
 
 // Отметить сообщения как прочитанные
 router.put('/:userId/read', authMiddleware, markMessagesAsRead);
