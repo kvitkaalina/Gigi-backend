@@ -5,7 +5,8 @@ import {
   sendMessage,
   markMessagesAsRead,
   getChats,
-  createChat
+  createChat,
+  deleteMessage
 } from '../controllers/messageController.js';
 import multer from 'multer';
 
@@ -32,5 +33,8 @@ router.post(
 
 // Отметить сообщения как прочитанные
 router.put('/:userId/read', authMiddleware, markMessagesAsRead);
+
+// Удаление сообщения по ID
+router.delete('/:messageId', authMiddleware, deleteMessage);
 
 export default router; 
