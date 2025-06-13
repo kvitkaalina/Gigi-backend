@@ -295,4 +295,26 @@ export const deleteMessage = async (req, res) => {
     console.error('Error deleting message:', error);
     res.status(500).json({ message: 'Error deleting message', error: error.message });
   }
+};
+
+// Редактирование сообщения
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    if (message.sender.toString() !== userId) {
+      return res.status(403).json({ message: 'You can edit only your own messages' });
+    }
+    message.content = content;
+    await message.save();
+    res.json({ message: 'Message updated', content });
+  } catch (error) {
+    console.error('Error editing message:', error);
+    res.status(500).json({ message: 'Error editing message', error: error.message });
+  }
 }; 

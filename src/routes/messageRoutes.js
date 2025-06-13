@@ -6,7 +6,8 @@ import {
   markMessagesAsRead,
   getChats,
   createChat,
-  deleteMessage
+  deleteMessage,
+  editMessage
 } from '../controllers/messageController.js';
 import multer from 'multer';
 
@@ -36,5 +37,8 @@ router.put('/:userId/read', authMiddleware, markMessagesAsRead);
 
 // Удаление сообщения по ID
 router.delete('/:messageId', authMiddleware, deleteMessage);
+
+// Редактирование сообщения по ID
+router.patch('/:messageId', authMiddleware, editMessage);
 
 export default router; 
