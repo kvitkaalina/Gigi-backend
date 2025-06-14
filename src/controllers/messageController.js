@@ -31,6 +31,7 @@ export const getMessages = async (req, res) => {
     const formattedMessages = messages.map(msg => ({
       _id: msg._id.toString(),
       content: msg.content,
+      type: msg.type,
       createdAt: msg.createdAt.toISOString(),
       read: msg.read,
       sender: {
