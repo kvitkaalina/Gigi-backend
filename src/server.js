@@ -119,7 +119,7 @@ mongoose.connect(process.env.MONGO_URI)
     console.log('MongoDB connection state:', mongoose.connection.readyState);
     console.log('Connected to database:', mongoose.connection.name);
     // Запуск сервера
-    const PORT = process.env.PORT || 5001;
+    const PORT = process.env.PORT || 5000;
     httpServer.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
