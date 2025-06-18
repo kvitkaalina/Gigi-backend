@@ -13,13 +13,26 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true,
+    required: function() {
+      return this.type !== 'repost';
+    },
     trim: true
   },
   type: {
     type: String,
-    enum: ['text', 'image'],
+    enum: ['text', 'image', 'repost'],
     default: 'text'
+  },
+  postId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post',
+    required: function() {
+      return this.type === 'repost';
+    }
+  },
+  comment: {
+    type: String,
+    trim: true
   },
   read: {
     type: Boolean,

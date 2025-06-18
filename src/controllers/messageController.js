@@ -2,6 +2,7 @@ import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
 import mongoose from 'mongoose';
 import { uploadImage } from '../utils/imageUpload.js';
+import Post from '../models/postModel.js';
 
 // Получение истории сообщений между двумя пользователями
 export const getMessages = async (req, res) => {
@@ -25,6 +26,11 @@ export const getMessages = async (req, res) => {
     .sort({ createdAt: 1 })
     .populate('sender', 'username avatar')
     .populate('receiver', 'username avatar')
+    .populate({
+      path: 'postId',
+      select: 'image description author',
+      populate: { path: 'author', select: 'username avatar' }
+    })
     .lean();
 
     // Преобразуем данные в нужный формат
@@ -43,7 +49,9 @@ export const getMessages = async (req, res) => {
         _id: msg.receiver._id.toString(),
         name: msg.receiver.username,
         avatar: msg.receiver.avatar || '/default-avatar.jpg'
-      }
+      },
+      postId: msg.postId || undefined,
+      comment: msg.comment || undefined
     }));
 
     console.log('Formatted messages:', formattedMessages);
@@ -58,7 +66,7 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { userId: receiverId } = req.params;
-    const { content, type = 'text' } = req.body;
+    const { content, type = 'text', postId, comment } = req.body;
     const senderId = req.user.id;
     let messageContent = content;
 
@@ -79,12 +87,22 @@ export const sendMessage = async (req, res) => {
       }
     }
 
+    // Если это репост, проверяем существование поста
+    if (type === 'repost') {
+      const post = await Post.findById(postId);
+      if (!post) {
+        return res.status(404).json({ message: 'Post not found' });
+      }
+    }
+
     // Создаем новое сообщение
     const message = new Message({
       sender: senderId,
       receiver: receiverId,
       content: messageContent,
       type,
+      postId: type === 'repost' ? postId : undefined,
+      comment: type === 'repost' ? comment : undefined,
       createdAt: new Date()
     });
 
@@ -94,6 +112,11 @@ export const sendMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username avatar')
       .populate('receiver', 'username avatar')
+      .populate({
+        path: 'postId',
+        select: 'image description author',
+        populate: { path: 'author', select: 'username avatar' }
+      })
       .lean();
 
     // Преобразуем данные в нужный формат
@@ -113,14 +136,11 @@ export const sendMessage = async (req, res) => {
 
     // Отправляем сообщение через Socket.IO
     req.io.to(receiverId).emit('newMessage', formattedMessage);
-    req.io.to(senderId).emit('newMessage', formattedMessage);
-
-    console.log('Message sent:', formattedMessage);
 
     res.status(201).json(formattedMessage);
   } catch (error) {
     console.error('Error sending message:', error);
-    res.status(500).json({ message: 'Error sending message', error: error.message });
+    res.status(500).json({ message: 'Error sending message' });
   }
 };
 
@@ -245,6 +265,11 @@ export const createChat = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'username avatar')
       .populate('receiver', 'username avatar')
+      .populate({
+        path: 'postId',
+        select: 'image description author',
+        populate: { path: 'author', select: 'username avatar' }
+      })
       .lean();
 
     // Получаем информацию о чате

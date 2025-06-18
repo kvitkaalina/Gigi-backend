@@ -4,6 +4,8 @@ import User from '../models/userModel.js';
 
 // Map для хранения активных подключений
 const activeConnections = new Map();
+// Map для хранения таймеров отключения
+const disconnectTimers = new Map();
 
 // Функция для форматирования сообщения
 const formatMessage = async (message) => {
@@ -53,12 +55,10 @@ export const initializeSocketIO = (io) => {
       socket.userId = user._id.toString();
       socket.user = user;
 
-      // Проверяем существующее подключение
-      const existingSocket = activeConnections.get(socket.userId);
-      if (existingSocket) {
-        console.log('Closing existing connection for user:', socket.userId);
-        existingSocket.disconnect(true);
-        activeConnections.delete(socket.userId);
+      // Очищаем существующий таймер отключения, если он есть
+      if (disconnectTimers.has(socket.userId)) {
+        clearTimeout(disconnectTimers.get(socket.userId));
+        disconnectTimers.delete(socket.userId);
       }
 
       next();
@@ -92,34 +92,66 @@ export const initializeSocketIO = (io) => {
     // Обработка отправки сообщения
     socket.on('sendMessage', async (data, callback) => {
       try {
-        const { recipientId, content } = data;
-        console.log('Received message:', { recipientId, content });
+        const { recipientId, content, type = 'text', postId, comment } = data;
 
-        // Создаем новое сообщение
-        const newMessage = await Message.create({
-          sender: socket.userId,
-          receiver: recipientId,
-          content,
-          createdAt: new Date(),
-          read: false
-        });
+        let newMessage;
+        if (type === 'repost') {
+          newMessage = await Message.create({
+            sender: socket.userId,
+            receiver: recipientId,
+            type: 'repost',
+            postId,
+            comment,
+            createdAt: new Date(),
+            read: false
+          });
+        } else {
+          newMessage = await Message.create({
+            sender: socket.userId,
+            receiver: recipientId,
+            content,
+            type,
+            createdAt: new Date(),
+            read: false
+          });
+        }
 
-        // Форматируем сообщение
-        const formattedMessage = await formatMessage(newMessage);
-        console.log('Formatted message:', formattedMessage);
+        const populatedMessage = await Message.findById(newMessage._id)
+          .populate('sender', 'username avatar')
+          .populate('receiver', 'username avatar')
+          .populate({
+            path: 'postId',
+            select: 'image description author',
+            populate: { path: 'author', select: 'username avatar' }
+          })
+          .lean();
+
+        const formattedMessage = {
+          ...populatedMessage,
+          _id: populatedMessage._id.toString(),
+          sender: {
+            _id: populatedMessage.sender._id.toString(),
+            username: populatedMessage.sender.username,
+            avatar: populatedMessage.sender.avatar || '/default-avatar.jpg'
+          },
+          receiver: {
+            _id: populatedMessage.receiver._id.toString(),
+            username: populatedMessage.receiver.username,
+            avatar: populatedMessage.receiver.avatar || '/default-avatar.jpg'
+          }
+        };
 
         // Отправляем сообщение отправителю
         socket.emit('newMessage', formattedMessage);
 
-        // Отправляем сообщение получателю, если он онлайн
+        // Отправляем сообщение получателю
         const recipientSocket = activeConnections.get(recipientId);
         if (recipientSocket) {
           recipientSocket.emit('newMessage', formattedMessage);
         }
-        
-        // Отправляем подтверждение
+
         if (callback) {
-          callback({ success: true, messageId: newMessage._id.toString() });
+          callback({ success: true, message: formattedMessage });
         }
       } catch (error) {
         console.error('Error sending message:', error);
@@ -148,35 +180,59 @@ export const initializeSocketIO = (io) => {
     });
 
     // Обработка отключения
-    socket.on('disconnect', async () => {
+    socket.on('disconnect', () => {
       console.log('User disconnected:', socket.userId);
-      
-      // Удаляем подключение из Map только если это то же самое сокет-соединение
-      if (activeConnections.get(socket.userId) === socket) {
-        activeConnections.delete(socket.userId);
-        
-        const lastSeen = new Date();
-        try {
-          await User.findByIdAndUpdate(socket.userId, {
-            isOnline: false,
-            lastSeen
-          });
 
-          io.emit('userStatusChanged', {
-            userId: socket.userId,
-            isOnline: false,
-            lastSeen: lastSeen.toISOString()
-          });
-        } catch (error) {
-          console.error('Error updating user status:', error);
+      // Устанавливаем таймер для обновления статуса
+      const timer = setTimeout(async () => {
+        // Проверяем, нет ли активного подключения
+        if (!activeConnections.has(socket.userId)) {
+          const lastSeen = new Date();
+          try {
+            await User.findByIdAndUpdate(socket.userId, {
+              isOnline: false,
+              lastSeen
+            });
+
+            io.emit('userStatusChanged', {
+              userId: socket.userId,
+              isOnline: false,
+              lastSeen: lastSeen.toISOString()
+            });
+          } catch (error) {
+            console.error('Error updating user status:', error);
+          }
         }
-      }
+        disconnectTimers.delete(socket.userId);
+      }, 5000); // Ждем 5 секунд перед обновлением статуса
+
+      disconnectTimers.set(socket.userId, timer);
+      activeConnections.delete(socket.userId);
     });
 
-    // Переподключение
+    // Обработка переподключения
     socket.on('reconnect', () => {
       console.log('User reconnected:', socket.userId);
+      
+      // Очищаем таймер отключения, если он есть
+      if (disconnectTimers.has(socket.userId)) {
+        clearTimeout(disconnectTimers.get(socket.userId));
+        disconnectTimers.delete(socket.userId);
+      }
+
       activeConnections.set(socket.userId, socket);
+      
+      // Обновляем статус пользователя
+      User.findByIdAndUpdate(socket.userId, { isOnline: true })
+        .then(() => {
+          io.emit('userStatusChanged', {
+            userId: socket.userId,
+            isOnline: true
+          });
+        })
+        .catch(error => {
+          console.error('Error updating user status:', error);
+        });
     });
   });
 }; 
